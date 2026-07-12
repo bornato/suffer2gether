@@ -1,9 +1,60 @@
 # Green Hell Multiplayer Patch - More Suffering Together
-TL;DR: Patch Green Hell to allow up to 8 people to play together instead of the default 4. Suffer More; Suffer Together!
+**Suffer2gether** is an open-source multiplayer patch for the survival game *Green Hell*.
+The tool modifies the game's core files to expand the default 4-player co-op limit,
+allowing up to **8 players to survive together** in the same game session. 
+
+Suffer More; Suffer Together!
+
+The application is distributed in three distinct formats, **Windows GUI, Windows CLI, and Linux CLI**. All core features,
+usage rules, multiplayer guidance, and removal instructions apply identically to every version.
 
 ![main patch window](assets/screenshot.png?raw=true "main patch window")
 
 ---
+
+### Core Features & Compatibility
+* **Universal Version Support:** The patch dynamically searches for specific byte patterns to expand the lobby.
+Because of this design, the patch **works across different versions of Green Hell** without requiring 
+constant code updates.
+* **No Save Game Risks:** Applying or using the patch **does not cause any issues with your save games**.
+* **Cross-Platform Compatibility:** The tool functions identically across both Windows and multiple Linux distributions,
+including the Steam Deck, using a unified core codebase.
+
+### Essential Usage & Multiplayer Guidance
+* **Mandatory for All Players:** Every player in your multiplayer session 
+**must apply the patch to their own game files**, regardless of whether they use the GUI or CLI versions. 
+* **Reapplication Required:** You must re-run the tool to reapply the patch 
+**every time Green Hell receives an official game update**, as updates will overwrite your patched files.
+* **Nameplate Bug:** If a player joins without the patch, 
+**player nameplates will not show up over their heads**, making it incredibly difficult to locate each other in the jungle.
+* **Joining Larger Lobbies:** The in-game user interface will **not** show that more than 4 players can be added.
+To add more than 4 players, you must **invite friends directly via the Steam/GoG overlay/interface**, 
+or have your friends **join your active game session through the Steam/GoG friends list**.
+
+### Performance & Networking Note
+* **Peer-to-Peer Architecture:** Green Hell relies on peer-to-peer (P2P) multiplayer, 
+meaning the host's computer bears the full burden of calculating and syncing everything
+for every player in the session.
+* **Host Performance Impact:** Because of this P2P nature, adding more players 
+increases the strain on the host's hardware and network. More players can lead to performance 
+issues like freezing, crashing, lag, or invisible players.
+* **Not Mod-Related:** These performance bottlenecks are inherent to the base game's P2P networking 
+design and are **not caused by the Suffer2gether patch** itself. A strong host PC and stable 
+connection are highly recommended for large lobbies.
+
+### Uninstallation & Patch Removal
+* **Steam/GoG Verification:** To completely remove the patch and return your game to its vanilla state, 
+simply use Steam's or Gog's **"Verify integrity of game files"** feature.
+* **Automatic Restoration:** Steam/GoG will automatically detect the modified file 
+and re-download the original version, seamlessly reverting the game.
+
+### Repository & Security Note
+* **Verify Hashes:** Release file hashes will be on every release; 
+be sure to verify these hashes to assert no one tampered with the binaries.
+* **Review Code:** The full source code and build process is available for review.
+* **False Positives:** A few antivirus engines on VirusTotal may flag the tool using heuristic scans.
+This is a **false positive**; for example, automated scanners mistakenly flag an embedded `.xm` tracker music 
+file as a Windows MSI installer. The tool is entirely safe to use.
 
 ## Usage
 ### Windows  
@@ -120,15 +171,6 @@ cmake --build out
 
 ## Editing Resources
 If you want to edit the buttons or font you will need to download and install the fonts listed in the [3rd Party Credit](#3rd-party-credit) section of this readme.
-
-## Virus/Malware/Trojan Warnings
-This file was written in C++ MFC with only 1 external lib dependency and it isn't signed. For some reason this triggers a few anti-virus packages to see this as a generic trojan or malware. This is a false positive and can be safely ignored.
-
-I originally started coding this in MASM32 Assembler for a much smaller executable and a fun project but this was triggering A/V heuristic detections like crazy. So I switched to a Visual Studio MFC project.
-I even tested a blank MFC template on [VirusTotal](https://www.virustotal.com/gui/file/62f97e4757e0a508110dd60b2729c688079bcda52e81b771b5ee923f2646f5bb/detection) but even that is detected by a few 
-A/V packages, including Microsoft Defender!
-
-The source code is available for review or build if you feel the release binary is untrusted. I will also be including a SHA256SUMS file with every release.
 
 ## 3rd Party Credit
 **Background image:** Repurposed from the Green Hell game files and modified by me for use as a window background. All credit for the walkie talkie images go to Creepy Jar for some fantastic work.
