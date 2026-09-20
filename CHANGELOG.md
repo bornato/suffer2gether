@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-20
+
+First release built by the hardened pipeline: every release now ships `SHA256SUMS` covering the
+executables as well as the archives, plus `BUILD-INFO-windows.txt` (commit, workflow run, runner
+image and toolchain versions) and the GUI's DLL dependency/import listings. The build fails if the
+removed audio component ever reappears in the executable.
+
 ### Removed
 
 - Background music in the Windows GUI. This removes the bundled precompiled uFMOD library
