@@ -14,5 +14,3 @@ IDB_PATCHDOWN           BITMAP                  "@CMAKE_SOURCE_DIR@\\resources\\
 IDB_PATCHHOVER          BITMAP                  "@CMAKE_SOURCE_DIR@\\resources\\button_patch_hover.bmp"
 IDB_PATCHUP             BITMAP                  "@CMAKE_SOURCE_DIR@\\resources\\button_patch_up.bmp"
 IDB_FONT                BITMAP                  "@CMAKE_SOURCE_DIR@\\resources\\font.bmp"
-
-IDR_MUSIC               RCDATA                  "@CMAKE_SOURCE_DIR@\\resources\\music3.xm"

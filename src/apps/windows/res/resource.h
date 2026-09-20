@@ -4,7 +4,6 @@
 
 #define IDB_BACKGROUND                  310
 #define ID_PATCH                        310
-#define IDR_MUSIC                       311
 #define ID_EXIT                         311
 #define IDB_EXITUP                      312
 #define ID_RENDERTIMER                  312
