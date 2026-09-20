@@ -1,10 +1,7 @@
 #include "framework.h"
-#include "res/resource.h"
-#include <mmsystem.h>
 
 #include "CApp.h"
 #include "CMainWindow.h"
-#include "ufmod.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -38,11 +35,6 @@ BOOL CApp::InitInstance()
 	Gdiplus::GdiplusStartupInput input;
 	Gdiplus::GdiplusStartup(&this->m_Token, &input, nullptr);
 
-#ifndef _DEBUG
-	uFMOD_SetVolume(13);
-	uFMOD_PlaySong(MAKEINTRESOURCE(IDR_MUSIC), this->m_hInstance, XM_RESOURCE);
-#endif
-
 	CMainWindow* mainWindow = new CMainWindow();
 	if (!mainWindow)
 		return FALSE;
@@ -58,10 +50,6 @@ int CApp::ExitInstance()
 
 	if (this->m_Token)
 		Gdiplus::GdiplusShutdown(this->m_Token);
-
-#ifndef _DEBUG
-	uFMOD_StopSong();
-#endif
 
 	if (this->m_Mutex)
 		ReleaseMutex(this->m_Mutex);

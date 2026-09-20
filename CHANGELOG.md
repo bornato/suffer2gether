@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Background music in the Windows GUI. This removes the bundled precompiled uFMOD library
+  (`extern/ufmod.lib`) and its header, the embedded XM module (`resources/music3.xm`,
+  `assets/late_at_morning.xm`) and the `winmm` link dependency. The patcher no longer contains
+  any third-party binary code; patching behaviour is unchanged.
+
 ## [1.2.1] - 2026-06-14
 
 1.2.1 is the first release to include a change log. The main focus of this release was a command line interface that

@@ -53,8 +53,8 @@ and re-download the original version, seamlessly reverting the game.
 be sure to verify these hashes to assert no one tampered with the binaries.
 * **Review Code:** The full source code and build process is available for review.
 * **False Positives:** A few antivirus engines on VirusTotal may flag the tool using heuristic scans.
-This is a **false positive**; for example, automated scanners mistakenly flag an embedded `.xm` tracker music 
-file as a Windows MSI installer. The tool is entirely safe to use.
+This is a **false positive**: the tool is a small unsigned MFC executable that links no third-party
+libraries. The tool is entirely safe to use.
 
 ## Usage
 ### Windows  
@@ -180,7 +180,3 @@ If you want to edit the buttons or font you will need to download and install th
 **Button Font:**
 This font is copyright (c) Jakob Fischer at [www.pizzadude.dk](http://www.pizzadude.dk), all rights reserved. Do not distribute without the author's permission.
 Use this font for non-commercial use only! If you plan to use it for commercial purposes, contact me before doing so!
-
-**uFMOD:** [uFMOD](http://ufmod.sourceforge.net/) is used for playing the XM music file.
-
-**Music:** Late at Morning created by Andreas Rohdin (MrGamer / Gamermachine). He has a lot of [great music](https://soundcloud.com/gamermachine). This module was downloaded from [modarchive](https://modarchive.org/index.php?request=view_by_moduleid&query=52842) and is distributed in this repository under the modarchive ["upload agreement"](https://modarchive.org/index.php?faq-licensing).

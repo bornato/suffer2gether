@@ -3,6 +3,18 @@ name: Build Workflow
 run-name: Build Workflow
 on:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      upload-artifacts:
+        description: Upload the built binaries as workflow artifacts
+        required: false
+        type: boolean
+        default: true
+      version:
+        description: Version to stamp into the binaries (vMAJOR.MINOR.PATCH)
+        required: false
+        type: string
+        default: v0.0.0
   workflow_call:
     inputs:
       upload-artifacts:
@@ -20,6 +32,12 @@ on:
         value: ${{ jobs.version.outputs.version_patch }}
       is_valid:
         value: ${{ jobs.version.outputs.is_valid }}
+
+
+# Building needs nothing beyond reading the repository. When called from
+# release.yaml the caller's token is narrowed to this.
+permissions:
+  contents: read
 
 
 jobs:
@@ -51,32 +69,32 @@ jobs:
     needs: version
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v6
-  
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
       - name: Set PATH
         run: |
           echo "~/.tools/cmake/bin:~/.tools/zig:~/.tools/ninja:\$PATH" > $GITHUB_PATH
-      
+
       - name: Cache CMake
         id: linux-cmake-tools
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ~/.tools/cmake
           key: ${{ runner.os }}-cmake-4.3.3
 
       - name: Cache Ninja
         id: linux-ninja-tools
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ~/.tools/ninja
           key: ${{ runner.os }}-ninja-1.13.2
 
       - name: Cache Zig
         id: linux-zig-tools
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ~/.tools/zig
-          key: ${{ runner.os }}-zig-0.17.0
+          key: ${{ runner.os }}-zig-0.16.0
 
       - name: Install CMake
         if: steps.linux-cmake-tools.outputs.cache-hit != 'true'
@@ -87,7 +105,7 @@ jobs:
           tar -zxvf /tmp/cmake.tgz -C /tmp
           sudo mkdir -p ~/.tools/cmake
           sudo mv /tmp/cmake-4.3.3-linux-x86_64/* ~/.tools/cmake/
-  
+
       - name: Install Ninja
         if: steps.linux-ninja-tools.outputs.cache-hit != 'true'
         env:
@@ -96,7 +114,7 @@ jobs:
           curl -sS -L -o /tmp/ninja.zip "${NINJA_URL}"
           sudo mkdir -p ~/.tools/ninja
           sudo unzip -d ~/.tools/ninja /tmp/ninja.zip
-  
+
       - name: Install Zig
         if: steps.linux-zig-tools.outputs.cache-hit != 'true'
         env:
@@ -113,8 +131,8 @@ jobs:
           cmake --build out
 
       - name: Upload Linux artifact
-        if: inputs.upload-artifacts
-        uses: actions/upload-artifact@v7
+        if: inputs.upload-artifacts || github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Linux artifact
           path: out/suffer2gether
@@ -122,34 +140,151 @@ jobs:
 
   build-windows:
     if: needs.version.outputs.is_valid == 'true'
-    runs-on: windows-2025-vs2026
+    # windows-2025 serves the "Windows Server 2025 with Visual Studio 2026"
+    # image since GitHub's June 2026 migration. The exact image version of a
+    # run is printed in its "Set up job" step.
+    runs-on: windows-2025
     needs: version
     defaults:
       run:
         shell: cmd
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      # Locate Visual Studio through vswhere instead of a hard-coded
+      # edition/version path. The x86/x64 C++ tools and MFC (ATLMFC) must
+      # both be present: the GUI is a static MFC application.
+      - name: Locate Visual Studio
+        run: |
+          set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+          if not exist "%VSWHERE%" (
+            echo ::error::vswhere.exe not found; is this a Visual Studio runner image?
+            exit /b 1
+          )
+          for /f "usebackq delims=" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.ATLMFC -property installationPath`) do set "VSDIR=%%i"
+          if not defined VSDIR (
+            echo ::error::No Visual Studio installation with the C++ x86/x64 tools and MFC components was found
+            exit /b 1
+          )
+          if not exist "%VSDIR%\VC\Auxiliary\Build\vcvars32.bat" (
+            echo ::error::vcvars32.bat not found under "%VSDIR%"
+            exit /b 1
+          )
+          echo Using Visual Studio at "%VSDIR%"
+          echo VSDIR=%VSDIR%>> "%GITHUB_ENV%"
 
       - name: Build release
         run: |
           echo "VERSION_MAJOR ${{ needs.version.outputs.version_major }}" > version.txt
           echo "VERSION_MINOR ${{ needs.version.outputs.version_minor }}" >> version.txt
           echo "VERSION_PATCH ${{ needs.version.outputs.version_patch }}" >> version.txt
-          call "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
-          cmake --preset windows-x86-release -B out
-          cmake --build out
+          call "%VSDIR%\VC\Auxiliary\Build\vcvars32.bat" || exit /b 1
+          cmake --version || exit /b 1
+          ninja --version || exit /b 1
+          cmake --preset windows-x86-release -B out || exit /b 1
+          cmake --build out -v > out\build-windows.log 2>&1
+          set "BUILD_EXIT=%ERRORLEVEL%"
+          type out\build-windows.log
+          if not "%BUILD_EXIT%"=="0" exit /b %BUILD_EXIT%
+          if not exist out\suffer2gether.exe (echo ::error::out\suffer2gether.exe was not produced & exit /b 1)
+          if not exist out\suffer2gether-cli.exe (echo ::error::out\suffer2gether-cli.exe was not produced & exit /b 1)
+
+      # Record what built the binaries: commit, workflow run, runner image,
+      # toolchain versions, and the DLL dependencies / imports of each EXE.
+      # (Redirections are written before the text so that values ending in a
+      # digit are not parsed by cmd as handle redirections.)
+      - name: Record build provenance
+        run: |
+          call "%VSDIR%\VC\Auxiliary\Build\vcvars32.bat" > nul || exit /b 1
+          set "INFO=out\BUILD-INFO-windows.txt"
+          > "%INFO%" echo repository=%GITHUB_REPOSITORY%
+          >> "%INFO%" echo commit=%GITHUB_SHA%
+          >> "%INFO%" echo ref=%GITHUB_REF%
+          >> "%INFO%" echo workflow=%GITHUB_WORKFLOW_REF%
+          >> "%INFO%" echo run=%GITHUB_SERVER_URL%/%GITHUB_REPOSITORY%/actions/runs/%GITHUB_RUN_ID%/attempts/%GITHUB_RUN_ATTEMPT%
+          >> "%INFO%" echo runner_image=%ImageOS% %ImageVersion%
+          >> "%INFO%" echo visual_studio=%VSDIR%
+          >> "%INFO%" echo vc_tools_version=%VCToolsVersion%
+          >> "%INFO%" echo windows_sdk_version=%WindowsSDKVersion%
+          for /f "delims=" %%v in ('cmake --version ^| findstr /i version') do (>> "%INFO%" echo cmake=%%v)
+          for /f "delims=" %%v in ('ninja --version') do (>> "%INFO%" echo ninja=%%v)
+          for /f "delims=" %%v in ('cl 2^>^&1 ^| findstr /i /c:"Compiler Version"') do (>> "%INFO%" echo cl=%%v)
+          for /f "delims=" %%v in ('link 2^>^&1 ^| findstr /i /c:"Linker Version"') do (>> "%INFO%" echo link=%%v)
+          type "%INFO%"
+          dumpbin /nologo /dependents out\suffer2gether.exe > out\suffer2gether.exe.dependents.txt || exit /b 1
+          dumpbin /nologo /imports out\suffer2gether.exe > out\suffer2gether.exe.imports.txt || exit /b 1
+          dumpbin /nologo /dependents out\suffer2gether-cli.exe > out\suffer2gether-cli.exe.dependents.txt || exit /b 1
+          dumpbin /nologo /imports out\suffer2gether-cli.exe > out\suffer2gether-cli.exe.imports.txt || exit /b 1
+          type out\suffer2gether.exe.dependents.txt
+
+      # Prove that the removed audio component is not in the GUI executable:
+      # no WINMM.dll dependency, no waveOut* import names, no XM module
+      # header, and none of uFMOD's machine code (32 relocation-free bytes
+      # from .text+0x400 of the ufmod.obj that used to live in
+      # extern/ufmod.lib; see the repository history for the original file).
+      # Then hash both executables in sha256sum format.
+      - name: Verify audio component is absent and hash binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'out\suffer2gether.exe'
+          $deps = Get-Content 'out\suffer2gether.exe.dependents.txt' -Raw
+          if ($deps -match '(?i)winmm\.dll') {
+            throw "$exe depends on WINMM.dll; the removed audio component appears to be back"
+          }
+          $latin1 = [System.Text.Encoding]::Latin1
+          $image = $latin1.GetString([System.IO.File]::ReadAllBytes($exe))
+          foreach ($needle in @('Extended Module:', 'waveOut')) {
+            if ($image.Contains($needle)) { throw "$exe contains '$needle'" }
+          }
+          $ufmodHex = '85db0f8588000000395eec8b4edc75624b8b168b4604891e85d2895e047c0389'
+          $ufmodBytes = [byte[]]::new($ufmodHex.Length / 2)
+          for ($i = 0; $i -lt $ufmodBytes.Length; $i++) {
+            $ufmodBytes[$i] = [System.Convert]::ToByte($ufmodHex.Substring(2 * $i, 2), 16)
+          }
+          if ($image.IndexOf($latin1.GetString($ufmodBytes), [System.StringComparison]::Ordinal) -ge 0) {
+            throw "$exe contains uFMOD machine code"
+          }
+          Write-Host "OK: $exe has no WINMM dependency, no XM module and no uFMOD code"
+          $lines = foreach ($f in @('suffer2gether.exe', 'suffer2gether-cli.exe')) {
+            $h = (Get-FileHash -Algorithm SHA256 -Path "out\$f").Hash.ToLowerInvariant()
+            "$h  $f"
+          }
+          [System.IO.File]::WriteAllText("$PWD\out\SHA256SUMS-windows.txt", ($lines -join "`n") + "`n")
+          Get-Content 'out\SHA256SUMS-windows.txt'
 
       - name: Upload Windows MFC artifact
-        if: inputs.upload-artifacts
-        uses: actions/upload-artifact@v7
+        if: inputs.upload-artifacts || github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Windows MFC artifact
           path: out/suffer2gether.exe
 
       - name: Upload Windows CLI artifact
-        if: inputs.upload-artifacts
-        uses: actions/upload-artifact@v7
+        if: inputs.upload-artifacts || github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Windows CLI artifact
           path: out/suffer2gether-cli.exe
+
+      - name: Upload Windows build provenance
+        if: inputs.upload-artifacts || github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Windows build provenance
+          path: |
+            out/BUILD-INFO-windows.txt
+            out/SHA256SUMS-windows.txt
+            out/suffer2gether.exe.dependents.txt
+            out/suffer2gether.exe.imports.txt
+            out/suffer2gether-cli.exe.dependents.txt
+            out/suffer2gether-cli.exe.imports.txt
+
+      - name: Upload Windows build log
+        if: always() && (inputs.upload-artifacts || github.event_name == 'pull_request')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Windows build log
+          path: out/build-windows.log
+          if-no-files-found: ignore

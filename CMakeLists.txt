@@ -42,14 +42,6 @@ if(WIN32)
         @ONLY
     )
 
-    add_library(ufmod_lib STATIC IMPORTED)
-
-    set_target_properties(
-        ufmod_lib
-        PROPERTIES IMPORTED_LOCATION
-          "${CMAKE_SOURCE_DIR}/extern/ufmod.lib"
-    )
-
     add_executable(${PROJECT_NAME} WIN32)
     set_target_properties(
       ${PROJECT_NAME}
@@ -65,17 +57,18 @@ if(WIN32)
         USE_MFC TRUE
     )
 
+    # GDI+ is used directly by CScreen/CCustomButton/CApp. MFC's static
+    # library objects also pull gdiplus.lib in through /DEFAULTLIB, but the
+    # dependency is stated here so it is visible in the build files.
     target_link_libraries(
       ${PROJECT_NAME}
       PRIVATE
-        ufmod_lib
-        winmm
+        gdiplus
     )
 
     target_include_directories(
       ${PROJECT_NAME}
       PRIVATE
-        "extern"
         "src/core"
         "src/platform/windows"
         "src/apps/windows"
