@@ -57,6 +57,15 @@ if(WIN32)
         USE_MFC TRUE
     )
 
+    # GDI+ is used directly by CScreen/CCustomButton/CApp. MFC's static
+    # library objects also pull gdiplus.lib in through /DEFAULTLIB, but the
+    # dependency is stated here so it is visible in the build files.
+    target_link_libraries(
+      ${PROJECT_NAME}
+      PRIVATE
+        gdiplus
+    )
+
     target_include_directories(
       ${PROJECT_NAME}
       PRIVATE
