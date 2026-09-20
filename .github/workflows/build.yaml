@@ -190,6 +190,70 @@ jobs:
           if not exist out\suffer2gether.exe (echo ::error::out\suffer2gether.exe was not produced & exit /b 1)
           if not exist out\suffer2gether-cli.exe (echo ::error::out\suffer2gether-cli.exe was not produced & exit /b 1)
 
+      # Record what built the binaries: commit, workflow run, runner image,
+      # toolchain versions, and the DLL dependencies / imports of each EXE.
+      # (Redirections are written before the text so that values ending in a
+      # digit are not parsed by cmd as handle redirections.)
+      - name: Record build provenance
+        run: |
+          call "%VSDIR%\VC\Auxiliary\Build\vcvars32.bat" > nul || exit /b 1
+          set "INFO=out\BUILD-INFO-windows.txt"
+          > "%INFO%" echo repository=%GITHUB_REPOSITORY%
+          >> "%INFO%" echo commit=%GITHUB_SHA%
+          >> "%INFO%" echo ref=%GITHUB_REF%
+          >> "%INFO%" echo workflow=%GITHUB_WORKFLOW_REF%
+          >> "%INFO%" echo run=%GITHUB_SERVER_URL%/%GITHUB_REPOSITORY%/actions/runs/%GITHUB_RUN_ID%/attempts/%GITHUB_RUN_ATTEMPT%
+          >> "%INFO%" echo runner_image=%ImageOS% %ImageVersion%
+          >> "%INFO%" echo visual_studio=%VSDIR%
+          >> "%INFO%" echo vc_tools_version=%VCToolsVersion%
+          >> "%INFO%" echo windows_sdk_version=%WindowsSDKVersion%
+          for /f "delims=" %%v in ('cmake --version ^| findstr /i version') do (>> "%INFO%" echo cmake=%%v)
+          for /f "delims=" %%v in ('ninja --version') do (>> "%INFO%" echo ninja=%%v)
+          for /f "delims=" %%v in ('cl 2^>^&1 ^| findstr /i /c:"Compiler Version"') do (>> "%INFO%" echo cl=%%v)
+          for /f "delims=" %%v in ('link 2^>^&1 ^| findstr /i /c:"Linker Version"') do (>> "%INFO%" echo link=%%v)
+          type "%INFO%"
+          dumpbin /nologo /dependents out\suffer2gether.exe > out\suffer2gether.exe.dependents.txt || exit /b 1
+          dumpbin /nologo /imports out\suffer2gether.exe > out\suffer2gether.exe.imports.txt || exit /b 1
+          dumpbin /nologo /dependents out\suffer2gether-cli.exe > out\suffer2gether-cli.exe.dependents.txt || exit /b 1
+          dumpbin /nologo /imports out\suffer2gether-cli.exe > out\suffer2gether-cli.exe.imports.txt || exit /b 1
+          type out\suffer2gether.exe.dependents.txt
+
+      # Prove that the removed audio component is not in the GUI executable:
+      # no WINMM.dll dependency, no waveOut* import names, no XM module
+      # header, and none of uFMOD's machine code (32 relocation-free bytes
+      # from .text+0x400 of the ufmod.obj that used to live in
+      # extern/ufmod.lib; see the repository history for the original file).
+      # Then hash both executables in sha256sum format.
+      - name: Verify audio component is absent and hash binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'out\suffer2gether.exe'
+          $deps = Get-Content 'out\suffer2gether.exe.dependents.txt' -Raw
+          if ($deps -match '(?i)winmm\.dll') {
+            throw "$exe depends on WINMM.dll; the removed audio component appears to be back"
+          }
+          $latin1 = [System.Text.Encoding]::Latin1
+          $image = $latin1.GetString([System.IO.File]::ReadAllBytes($exe))
+          foreach ($needle in @('Extended Module:', 'waveOut')) {
+            if ($image.Contains($needle)) { throw "$exe contains '$needle'" }
+          }
+          $ufmodHex = '85db0f8588000000395eec8b4edc75624b8b168b4604891e85d2895e047c0389'
+          $ufmodBytes = [byte[]]::new($ufmodHex.Length / 2)
+          for ($i = 0; $i -lt $ufmodBytes.Length; $i++) {
+            $ufmodBytes[$i] = [System.Convert]::ToByte($ufmodHex.Substring(2 * $i, 2), 16)
+          }
+          if ($image.IndexOf($latin1.GetString($ufmodBytes), [System.StringComparison]::Ordinal) -ge 0) {
+            throw "$exe contains uFMOD machine code"
+          }
+          Write-Host "OK: $exe has no WINMM dependency, no XM module and no uFMOD code"
+          $lines = foreach ($f in @('suffer2gether.exe', 'suffer2gether-cli.exe')) {
+            $h = (Get-FileHash -Algorithm SHA256 -Path "out\$f").Hash.ToLowerInvariant()
+            "$h  $f"
+          }
+          [System.IO.File]::WriteAllText("$PWD\out\SHA256SUMS-windows.txt", ($lines -join "`n") + "`n")
+          Get-Content 'out\SHA256SUMS-windows.txt'
+
       - name: Upload Windows MFC artifact
         if: inputs.upload-artifacts || github.event_name == 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -203,6 +267,19 @@ jobs:
         with:
           name: Windows CLI artifact
           path: out/suffer2gether-cli.exe
+
+      - name: Upload Windows build provenance
+        if: inputs.upload-artifacts || github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Windows build provenance
+          path: |
+            out/BUILD-INFO-windows.txt
+            out/SHA256SUMS-windows.txt
+            out/suffer2gether.exe.dependents.txt
+            out/suffer2gether.exe.imports.txt
+            out/suffer2gether-cli.exe.dependents.txt
+            out/suffer2gether-cli.exe.imports.txt
 
       - name: Upload Windows build log
         if: always() && (inputs.upload-artifacts || github.event_name == 'pull_request')
